@@ -271,8 +271,6 @@ model_2 <- glm(Depression ~ Sleep_Duration + Work_Hours,
 
 **4.1 Chi-square Test of independence: Depression and Job Satisfaction**                   
 
-- *Here is the R code of the result of Chi-square test:*
-
 ```{r, message=FALSE, warning=FALSE}
 # Now let’s run the chi-square test of independence
 # we need to specify "correct = FALSE" so no continuity correction is applied.
@@ -305,8 +303,6 @@ depression_data %>%
 ```
 
 **4.2 General Logistic Regression: Depression and Financial Stress**                   
-
-- *Here is the R code of the result of general logistic regression:*
 
 ```{r, message=FALSE, warning=FALSE}
 # Summary of the model
@@ -346,8 +342,6 @@ ggplot(depression_data, aes(x = Financial_Stress, y = Predicted_Prob,
 ```
 
 **4.3 Chi-square Test of independence: Depression and Family Mental Health History**      
-
-- *Here is the R code of the result of Chi-square test:*
 
 ```{r, message=FALSE, warning=FALSE}
 # Now let’s run the chi-square test of independence
