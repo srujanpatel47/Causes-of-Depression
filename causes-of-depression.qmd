@@ -1,0 +1,458 @@
+---
+title: "Causes of Depression"
+author: "Srujan Patel"
+format: pdf
+---
+
+
+```{r, message=FALSE, warning=FALSE}
+
+# Lets load required packages
+library(readxl)
+library(skimr)
+library(psych)
+library(Hmisc)
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+library(knitr)
+library(kableExtra)
+library(chisq.posthoc.test)
+library(effectsize)
+library(datarium)
+library(rstatix)
+library(tidyverse)   
+library(broom)
+```
+
+```{r, message=FALSE, warning=FALSE}
+# Lets import the dataset
+depression_data <- read_excel("Depression-Professional-Dataset.xlsx")
+```
+
+```{r, message=FALSE, warning=FALSE}
+# rename the variable with proper name 
+depression_data <- depression_data %>%
+  rename(
+    Work_Pressure = 'Work Pressure',
+    Job_Satisfaction = 'Job Satisfaction',
+    Sleep_Duration = 'Sleep Duration',
+    Dietary_Habits = 'Dietary Habits',
+    Suicidal_Thoughts = 'Suicidal Thoughts',
+    Work_Hours = 'Work Hours',
+    Financial_Stress = 'Financial Stress',
+    Fam_Mental_Hx = 'Family History of Mental Illness'
+  )
+```
+
+```{r, message=FALSE, warning=FALSE}
+# Lets convert categorical variables to factor
+depression_data$Gender <- factor(depression_data$Gender)
+depression_data$Depression <- factor(depression_data$Depression)
+depression_data$Suicidal_Thoughts <- factor(depression_data$Suicidal_Thoughts)
+depression_data$Fam_Mental_Hx <- factor(depression_data$Fam_Mental_Hx)
+depression_data$Dietary_Habits <- factor(depression_data$Dietary_Habits)
+```
+
+```{r, message=FALSE, warning=FALSE}
+# Convert Work Pressure to an ordered factor
+depression_data$Work_Pressure <- factor(depression_data$Work_Pressure, 
+                                        levels = c(1, 2, 3, 4, 5), 
+                                        labels = c("Very Low", "Low", 
+                                                   "Moderate", "High", 
+                                                   "Very High"), 
+                                        ordered = TRUE)
+
+# Convert Job Satisfaction to an ordered factor
+depression_data$Job_Satisfaction <- factor(depression_data$Job_Satisfaction, 
+                                           levels = c(1, 2, 3, 4, 5), 
+                                           labels = c("Very Dissatisfied", 
+                                                      "Dissatisfied",
+                                                      "Neutral", "Satisfied",
+                                                      "Very Satisfied"), 
+                                           ordered = TRUE)
+```
+
+```{r, message=FALSE, warning=FALSE}
+# Convert Sleep_Duration to numeric from char
+depression_data <- depression_data %>%
+  mutate(Sleep_Duration = case_when(
+    Sleep_Duration == "Less than 5 hours" ~ 4,
+    Sleep_Duration == "5-6 hours" ~ 5.5,
+    Sleep_Duration == "7-8 hours" ~ 7.5,
+    Sleep_Duration == "More than 8 hours" ~ 9
+  ))
+```
+
+\newpage
+
+Table 1:Bifurcation of variables by data types and more statistical results including missing counts.
+
+```{r, message=FALSE, warning=FALSE}
+# summary of pre-processed dataset
+skim(depression_data, )
+```
+
+Table summary: Glimpse of the cleaned data after prepprocessed.
+
+```{r, message=FALSE, warning=FALSE}
+sample_data <- depression_data %>% slice(1:10)
+# Split the table into two subsets
+subset1 <- sample_data %>% select(1:5) # First 5 columns
+subset2 <- sample_data %>% select(6:ncol(sample_data)) # Remaining columns
+
+# Render the subsets as two separate tables
+kable(subset1, caption = "Subset 1: First 5 Columns") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+
+kable(subset2, caption = "Subset 2: Remaining Columns") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"))
+```
+
+- Lets take a look at our numeric data via visuals.
+
+```{r, message=FALSE, warning=FALSE}
+#| label: fig 1
+#| fig-cap: Summary of numeric variables
+# Adjust layout to 2x4 for better distribution
+par(mfrow = c(2, 4), mar = c(4, 4, 2, 1), oma = c(2, 2, 2, 2))
+
+# Histogram of Age
+hist(depression_data$Age, breaks = 10, col = "skyblue", border = "black", 
+     main = "Distribution of Age", xlab = "Age (Years)", ylab = "Counts", cex.main = 0.8)
+
+# Boxplot of Age
+boxplot(depression_data$Age, col = "lightgreen", border = "black", 
+        main = "Boxplot of Age Data", ylab = "Age (Years)", cex.main = 0.8)
+
+# Histogram of Sleep Duration
+hist(depression_data$Sleep_Duration, breaks = 10, col = "skyblue", border = "black", 
+     main = "Distribution of Sleep", xlab = "Sleep Hours", ylab = "Counts", cex.main = 0.8)
+
+# Boxplot of Sleep Duration
+boxplot(depression_data$Sleep_Duration, col = "lightgreen", border = "black", 
+        main = "Boxplot of Sleep Duration", ylab = "Sleep Hours", cex.main = 0.8)
+
+# Histogram of Work Hours
+hist(depression_data$Work_Hours, breaks = 10, col = "skyblue", border = "black", 
+     main = "Distribution of Work Hours", xlab = "Work Hours", ylab = "Counts", cex.main = 0.8)
+
+# Boxplot of Work Hours
+boxplot(depression_data$Work_Hours, col = "lightgreen", border = "black", 
+        main = "Boxplot of Work Hours", ylab = "Work Hours", cex.main = 0.8)
+
+# Histogram of Financial Stress
+hist(depression_data$Financial_Stress, breaks = 10, col = "skyblue", border = "black", 
+     main = "Distribution of Financial Stress", xlab = "Stress Scale", ylab = "Counts", cex.main = 0.8)
+
+# Boxplot of Financial Stress
+boxplot(depression_data$Financial_Stress, col = "lightgreen", border = "black", 
+        main = "Boxplot of Financial Stress", ylab = "Stress Scale", cex.main = 0.8)
+
+par(mfrow = c(1, 1))
+
+```
+
+- Below is the summary of Job Satisfaction and Work Pressure with Sleep Duration by box plot.
+
+```{r, message=FALSE, warning=FALSE}
+#| label: fig 2
+#| fig-cap: summary of Job Satisfaction and Work Pressure with Sleep Duration by boxplot
+
+# Plot 1: Sleep Duration by Job Satisfaction
+plot1 <- ggplot(depression_data, aes(x = Job_Satisfaction, y = Sleep_Duration)) +
+  geom_boxplot(fill = c("lightblue", "lightgreen", "lightcoral", "lightyellow",
+                        "lightpink")) +
+  labs(title = "Sleep Duration by Job Satisfaction", x = "Job Satisfaction", 
+       y = "Sleep Duration (Hours)") +
+  theme_minimal(base_size = 9) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Plot 2: Sleep Duration by Work Pressure
+plot2 <- ggplot(depression_data, aes(x = Work_Pressure, y = Sleep_Duration)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(title = "Sleep Duration by Work Pressure", x = "Work Pressure", 
+       y = "Sleep Duration (Hours)") +
+  theme_minimal(base_size = 9) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Combine plots side by side
+grid.arrange(plot1, plot2, ncol = 2)
+
+```
+
+\newpage
+
+## 3. Method / Statistical Procedure 
+
+This study uses a combination of statistical tests to investigate the factors that influence depression, taking into account both categorical and continuous data. Depression acts as the response variable in all analyses. The type of data for each predictor and the specific hypotheses under test influenced the statistical tests used. The methodologies utilized are described in full below, along with their relation to the study's objectives.
+
+
+**3.1 Chi-Square Test for Depression and Job Satisfaction**                       
+
+- *Here is the R code for the chi-square for mention variables above:*
+
+```{r, message=FALSE, warning=FALSE}
+# Creating the contingency table
+contingency_table <- table(depression_data$Job_Satisfaction, 
+                           depression_data$Depression)
+
+# Adding dimension names
+dimnames(contingency_table) <- list(Job_Satisfaction = c("Very Dissatisfied",
+                                                         "Dissatisfied", 
+                                                         "Neutral", 
+                                                         "Satisfied", 
+                                                         "Very Satisfied"),
+                                    Depression = c("Yes", "No"))
+
+# Adding row and column labels with addmargins()
+labeled_table <- addmargins(contingency_table)
+
+# Displaying the labeled table with kable
+kable(labeled_table, caption = "Contingency Table: 
+      Job Satisfaction vs Depression")
+```
+
+
+
+**3.2 General Logistic Regression for Depression and Financial Stress**           
+
+- *Here is the R code for logistic regression model for mention variables above:*
+
+```{r, message=FALSE, warning=FALSE}
+# Logistic regression model
+model <- glm(Depression ~ Financial_Stress, data = depression_data, 
+             family = binomial)
+```
+
+
+
+**3.3 Chi-Square Test for Depression and Family Mental Health History**           
+
+- *Here is the R code for Chi-square test for mention variables above:*
+
+```{r, message=FALSE, warning=FALSE}
+# Creating the contingency table
+contingency_table_2 <- table(depression_data$Fam_Mental_Hx, 
+                             depression_data$Depression)
+
+# Adding dimension names
+dimnames(contingency_table_2) <- list(
+  `Family Mental History` = c("Yes", "No"),
+  Depression = c("Yes", "No")
+)
+
+# Adding row and column labels with addmargins()
+labeled_table_2 <- addmargins(contingency_table_2)
+
+# Displaying the labeled table with kable
+kable(labeled_table_2, caption = "Contingency Table: 
+      Family Mental Health History vs Depression")
+
+```
+
+
+
+**3.4 Multiple Logistic Regression for Depression, Sleep Duration, and Work Hours**
+
+- *Here is the R code for multi-logistic regression model for mention variables above:*
+
+```{r, message=FALSE, warning=FALSE}
+# Lets perform the multi-logistic regression
+model_2 <- glm(Depression ~ Sleep_Duration + Work_Hours, 
+             data = depression_data, 
+             family = binomial)
+```
+
+
+\newpage
+
+## 4. Results
+
+**4.1 Chi-square Test of independence: Depression and Job Satisfaction**                   
+
+- *Here is the R code of the result of Chi-square test:*
+
+```{r, message=FALSE, warning=FALSE}
+# Now let’s run the chi-square test of independence
+# we need to specify "correct = FALSE" so no continuity correction is applied.
+chisq.test(x = contingency_table, correct = FALSE)
+```
+
+```{r, message=FALSE, warning=FALSE}
+# Since the chi-square test of independence was significant, we can calculate 
+# the odds ratio as our effect size.
+cramers_v(contingency_table)
+```
+
+```{r, message=FALSE, warning=FALSE}
+# Now, let's run a chi-square post hoc test
+chisq.posthoc.test(contingency_table)
+```
+
+```{r, message=FALSE, warning=FALSE}
+#| label: fig 3
+#| fig-cap: Depression Propirtion by Job Satisfaction Level
+ 
+# Visualization: Depression and Job Satisfaction through all five levels
+depression_data %>%
+  ggplot(aes(x = Job_Satisfaction, fill = Depression)) +
+  geom_bar(position = "fill") +
+  labs(title = "Depression and Job Satisfaction",
+       x = "Job Satisfaction Levels", y = "Proportion") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+**4.2 General Logistic Regression: Depression and Financial Stress**                   
+
+- *Here is the R code of the result of general logistic regression:*
+
+```{r, message=FALSE, warning=FALSE}
+# Summary of the model
+summary(model)
+```
+
+```{r, message=FALSE, warning=FALSE}
+# Odds ratios and confidence intervals
+odds_ratios <- exp(cbind(Odds_Ratio = coef(model), confint(model)))
+```
+
+```{r, message=FALSE, warning=FALSE}
+# Print odds ratios
+print(odds_ratios)
+```
+
+```{r, message=FALSE, warning=FALSE}
+# Add predicted probabilities to the dataset
+depression_data$Predicted_Prob <- predict(model, type = "response")
+```
+
+```{r, message=FALSE, warning=FALSE}
+#| label: fig 4
+#| fig-cap: Financial Stress Effect on Depression
+
+# Visualization: Impact of financial stress on depression
+ggplot(depression_data, aes(x = Financial_Stress, y = Predicted_Prob, 
+                            color = Depression)) +
+  geom_point(size = 2.5) +
+  geom_smooth(method = "glm", method.args = list(family = binomial), se = FALSE) +
+  labs(title = "Impact of Financial Stress on Depression",
+       x = "Financial Stress",
+       y = "Predicted Probability of Depression") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+```
+
+**4.3 Chi-square Test of independence: Depression and Family Mental Health History**      
+
+- *Here is the R code of the result of Chi-square test:*
+
+```{r, message=FALSE, warning=FALSE}
+# Now let’s run the chi-square test of independence
+# we need to specify "correct = FALSE" so no continuity correction is applied.
+chisq.test(x = contingency_table_2, correct = FALSE)
+```
+
+```{r, message=FALSE, warning=FALSE}
+# Just for additional information we will calculate the odds ratio as our 
+#effect size.
+cramers_v(contingency_table_2)
+```
+
+**4.4 Multi Logistic Regression: Depression, Sleep Duration, and Work Hours**     
+
+- *Here is the R code of the result of multi-logistic regression:*
+
+```{r, message=FALSE, warning=FALSE}
+# Summary of the model
+summary(model_2)
+```
+
+```{r, message=FALSE, warning=FALSE}
+# Odds ratios and confidence intervals
+odds_ratios_2 <- exp(cbind(Odds_Ratio = coef(model_2), confint(model_2)))
+print(odds_ratios_2)
+```
+
+```{r, message=FALSE, warning=FALSE}
+#| label: fig 5
+#| fig-cap: Predicted probability of depression across different work hour levels and Sleep Duration
+
+# Visualization: Effect of Sleep Duration and Work Hours on Depression
+# First lets generate a grid of Sleep_Duration and Work_Hours for predictions
+grid <- expand.grid(
+  Sleep_Duration = seq(min(depression_data$Sleep_Duration), 
+                       max(depression_data$Sleep_Duration), length.out = 100),
+  Work_Hours = seq(min(depression_data$Work_Hours), 
+                   max(depression_data$Work_Hours), length.out = 5)
+)
+grid$Predicted_Prob <- predict(model_2, newdata = grid, type = "response")
+
+# Lets plot the graph
+library(ggplot2)
+ggplot(grid, aes(x = Sleep_Duration, y = Predicted_Prob, color = 
+                   as.factor(Work_Hours), group = Work_Hours)) +
+  geom_line(size = 0.7) +  # Simple, bold lines
+  scale_color_brewer(palette = "Set1", name = "Work Hours (hours)") +  
+  # Use an attractive color palette
+  labs(
+    title = "Effect of Sleep Duration and Work Hours on Depression",
+    x = "Sleep Duration (hours)",
+    y = "Predicted Probability of Depression"
+  ) +
+  theme_minimal(base_size = 16) +  # Clean, minimal theme
+  theme(
+    legend.position = "top",
+    legend.title = element_text(size = 10, face = "bold"),
+    legend.text = element_text(size = 9),
+    plot.title = element_text(size = 14, face = "bold"),
+    plot.subtitle = element_text(size = 12, face = "italic"),
+    axis.title = element_text(size = 11),
+    axis.text = element_text(size = 11)
+  )
+```
+
+
+```{r predictors-plot, fig.width=7, fig.height=5, message=FALSE, warning=FALSE}
+#| label: fig 6
+#| fig-cap: Odds Ratios for Numeric Predictors of Depression
+
+predictors <- c("Financial Stress", "Sleep Duration", "Work Hours")
+odds_ratios <- c(1.456, 0.849, 1.128)
+ci_lower <- c(1.306, 0.784, 1.084)
+ci_upper <- c(1.628, 0.919, 1.176)
+
+viz_data <- data.frame(
+  Predictor = predictors,
+  OR = odds_ratios,
+  Lower = ci_lower,
+  Upper = ci_upper
+)
+
+ggplot(viz_data, aes(x = Predictor, y = OR)) +
+  geom_point(size = 2) + 
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2) +
+  coord_flip() +
+  labs(
+    title = "Predictors of Depression (Logistic Regression)",
+    y = "Odds Ratio (95% CI)", x = "Predictors"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.y = element_text(size = 8), # Adjusted size for PDF
+    axis.text.x = element_text(size = 8),
+    plot.title = element_text(size = 10, face = "bold"),
+    plot.margin = margin(10, 10, 10, 10) # Adds space around plot
+  ) +
+  annotate("text", x = 2.5, y = 1.4, 
+           label = "Chi-Square Significant\n(Job Satisfaction)", 
+           color = "blue", size = 3, hjust = 0) +
+  annotate("text", x = 3, y = 1.4, 
+           label = "Chi-Square not Significant\n(Family History)", 
+           color = "red", size = 3, hjust = 0) +
+  geom_hline(yintercept = 1, linetype = "dashed", color = "gray")
+
+```
+
